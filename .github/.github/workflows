@@ -1,0 +1,51 @@
+```yaml
+name: Build Windows VST3
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Configure CMake
+        run: cmake -S . -B build -A x64
+
+      - name: Build VST3 and Standalone
+        run: cmake --build build --config Release --parallel
+
+      - name: Collect build artifacts
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path artifacts | Out-Null
+
+          Get-ChildItem -Path build -Recurse -Directory -Filter "*.vst3" |
+            ForEach-Object {
+              Copy-Item $_.FullName artifacts -Recurse -Force
+            }
+
+          Get-ChildItem -Path build -Recurse -File -Include "*.exe","*.dll" |
+            Where-Object {
+              $_.FullName -match "Standalone|VUMisterNAM"
+            } |
+            ForEach-Object {
+              Copy-Item $_.FullName artifacts -Force
+            }
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: VUMisterNAM-Windows-Release
+          path: artifacts/**
+          if-no-files-found: error
+```
